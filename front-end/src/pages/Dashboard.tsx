@@ -1,63 +1,52 @@
 import { Icon } from '@iconify/react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { apiFetch } from '../lib/api'
+import type { DashboardResponse } from '../lib/api'
 
-const statCards = [
-  { label: 'Total products', value: '2,842', delta: '+4.5%', icon: 'solar:box-minimalistic-linear' },
-  { label: 'Categories', value: '36', delta: null, icon: 'solar:folder-with-files-linear' },
-  { label: 'Units in stock', value: '15,920', delta: '+12%', icon: 'solar:layers-linear' },
-  {
-    label: 'Low stock alerts',
-    value: '12',
-    delta: 'items',
-    icon: 'solar:danger-triangle-bold',
-    danger: true,
-  },
-]
-
-const chartBars = [
-  { label: 'Mon', inboundHeight: '40%', outboundHeight: '60%' },
-  { label: 'Tue', inboundHeight: '50%', outboundHeight: '75%' },
-  { label: 'Wed', inboundHeight: '30%', outboundHeight: '45%' },
-  { label: 'Thu', inboundHeight: '60%', outboundHeight: '90%' },
-  { label: 'Fri', inboundHeight: '40%', outboundHeight: '65%' },
-  { label: 'Sat', inboundHeight: '20%', outboundHeight: '35%' },
-  { label: 'Sun', inboundHeight: '15%', outboundHeight: '25%' },
-]
-
-const activities = [
-  {
-    title: 'Received 50 MacBook Pro units',
-    meta: '10 minutes ago • Main warehouse',
-    icon: 'solar:import-bold',
-    tone: 'bg-emerald-50 text-emerald-600',
-  },
-  {
-    title: 'Out of stock: AirPods Pro',
-    meta: '2 hours ago • Needs replenishment',
-    icon: 'solar:danger-circle-bold',
-    tone: 'bg-red-50 text-red-600',
-  },
-  {
-    title: 'Added new item: iPad Air M2',
-    meta: 'Yesterday • Trung Kien Le',
-    icon: 'solar:add-square-bold',
-    tone: 'bg-blue-50 text-blue-600',
-  },
-  {
-    title: 'Updated iPhone 15 pricing',
-    meta: '2 days ago • Administrator',
-    icon: 'solar:pen-bold',
-    tone: 'bg-slate-100 text-slate-600',
-  },
-]
+const cardIcons: Record<string, string> = {
+  'Total products': 'solar:box-minimalistic-linear',
+  Categories: 'solar:folder-with-files-linear',
+  'Units in stock': 'solar:layers-linear',
+  'Low stock alerts': 'solar:danger-triangle-bold',
+}
 
 export default function DashboardTab() {
+  const { user } = useAuth()
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        const response = await apiFetch<DashboardResponse>('/api/dashboard')
+        setDashboard(response)
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load dashboard data.')
+      }
+    }
+
+    void loadDashboard()
+  }, [])
+
+  const maxMovement = useMemo(() => {
+    if (!dashboard) {
+      return 1
+    }
+
+    return Math.max(
+      1,
+      ...dashboard.movement.flatMap((bar) => [bar.incoming, bar.outgoing]),
+    )
+  }, [dashboard])
+
   return (
     <div className="mx-auto max-w-6xl p-10">
       <header className="mb-10 flex items-end justify-between">
         <div>
           <h1 className="font-heading text-4xl font-black tracking-tight text-[#0f1724]">
-            Good morning, Kien!
+            Good morning, {user?.name ?? 'Seller'}!
           </h1>
           <p className="mt-2 text-slate-500">
             Here is what is happening across your store and inventory today.
@@ -72,8 +61,14 @@ export default function DashboardTab() {
         </Link>
       </header>
 
+      {error ? (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
+        {(dashboard?.stats ?? []).map((card) => (
           <div
             key={card.label}
             className={[
@@ -98,7 +93,7 @@ export default function DashboardTab() {
                     : 'bg-slate-100 text-slate-600 group-hover:bg-primary/10 group-hover:text-primary',
                 ].join(' ')}
               >
-                <Icon icon={card.icon} className="text-xl" />
+                <Icon icon={cardIcons[card.label] ?? 'solar:widget-5-linear'} className="text-xl" />
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -108,7 +103,7 @@ export default function DashboardTab() {
                   card.danger ? 'text-red-600' : 'text-[#0f1724]',
                 ].join(' ')}
               >
-                {card.value}
+                {card.value.toLocaleString()}
               </span>
               {card.delta ? (
                 <span
@@ -129,20 +124,22 @@ export default function DashboardTab() {
         <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-8">
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h2 className="font-heading text-xl font-bold text-[#0f1724]">Inventory movement</h2>
+              <h2 className="font-heading text-xl font-bold text-[#0f1724]">Catalog activity</h2>
               <p className="text-sm text-slate-500">Last 7 days</p>
             </div>
-            <select className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold outline-none">
-              <option>This week</option>
-              <option>This month</option>
-            </select>
           </div>
 
           <div className="flex h-64 items-end justify-between gap-4">
-            {chartBars.map((bar) => (
+            {(dashboard?.movement ?? []).map((bar) => (
               <div key={bar.label} className="flex h-full flex-1 flex-col justify-end gap-2">
-                <div className="w-full rounded-t-lg bg-primary/20" style={{ height: bar.inboundHeight }} />
-                <div className="w-full rounded-t-lg bg-primary" style={{ height: bar.outboundHeight }} />
+                <div
+                  className="w-full rounded-t-lg bg-primary/20"
+                  style={{ height: `${(bar.incoming / maxMovement) * 100}%` }}
+                />
+                <div
+                  className="w-full rounded-t-lg bg-primary"
+                  style={{ height: `${(bar.outgoing / maxMovement) * 100}%` }}
+                />
                 <span className="text-center text-[10px] font-bold text-slate-400">{bar.label}</span>
               </div>
             ))}
@@ -151,11 +148,11 @@ export default function DashboardTab() {
           <div className="mt-6 flex justify-center gap-6">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-primary/20" />
-              <span className="text-xs font-medium text-slate-500">Incoming</span>
+              <span className="text-xs font-medium text-slate-500">New products</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-primary" />
-              <span className="text-xs font-medium text-slate-500">Outgoing</span>
+              <span className="text-xs font-medium text-slate-500">Product updates</span>
             </div>
           </div>
         </div>
@@ -163,8 +160,8 @@ export default function DashboardTab() {
         <div className="rounded-2xl border border-slate-200 bg-white p-8">
           <h2 className="mb-6 font-heading text-xl font-bold text-[#0f1724]">Activity</h2>
           <div className="space-y-6">
-            {activities.map((activity) => (
-              <div key={activity.title} className="flex gap-4">
+            {(dashboard?.activities ?? []).map((activity) => (
+              <div key={`${activity.timestamp}-${activity.title}`} className="flex gap-4">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${activity.tone}`}>
                   <Icon icon={activity.icon} className="text-lg" />
                 </div>

@@ -26,6 +26,33 @@ export type Product = {
   category?: Category | null
 }
 
+export type DashboardStat = {
+  label: string
+  value: number
+  delta: string | null
+  danger?: boolean
+}
+
+export type DashboardMovementBar = {
+  label: string
+  incoming: number
+  outgoing: number
+}
+
+export type DashboardActivity = {
+  title: string
+  meta: string
+  icon: string
+  tone: string
+  timestamp: string
+}
+
+export type DashboardResponse = {
+  stats: DashboardStat[]
+  movement: DashboardMovementBar[]
+  activities: DashboardActivity[]
+}
+
 export type AssistantIntent = 'onboarding' | 'tax_advice' | 'product_form_fill'
 
 export type ProductDraft = {

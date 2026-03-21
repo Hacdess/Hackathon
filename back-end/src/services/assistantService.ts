@@ -172,6 +172,22 @@ function detectIntent(message: string, currentPath?: string) {
   return 'onboarding' as const
 }
 
+function wantsInternetLookup(message: string) {
+  const lower = message.toLowerCase()
+
+  return (
+    lower.includes('from the internet') ||
+    lower.includes('from internet') ||
+    lower.includes('search the web') ||
+    lower.includes('search online') ||
+    lower.includes('look it up') ||
+    lower.includes('find the product details') ||
+    lower.includes('auto generate') ||
+    lower.includes('generate the fields') ||
+    lower.includes('fill the form for me')
+  )
+}
+
 function fallbackAssistantResponse(request: AssistantRequest): AssistantResponse {
   const intent = detectIntent(request.message, request.currentPath)
   const draft = intent === 'product_form_fill' ? extractDraftFromText(request.message) : null
@@ -237,6 +253,7 @@ async function generateConversationReply(request: AssistantRequest) {
     return fallbackAssistantResponse(request)
   }
 
+  const internetLookup = wantsInternetLookup(request.message)
   const conversationPrompt = `
 You are the Agora conversation agent for a seller support app.
 Your jobs are:
@@ -264,12 +281,14 @@ Do not return productDraft here.
 If the user is providing product data, set intent to "product_form_fill".
 When product data is partial, ask only for the missing fields.
 When product data seems complete, ask the user to confirm the captured fields before submission.
+When the user explicitly asks you to search online or generate the product form from internet data, mention that you searched online and ask the user to confirm the generated details before saving.
 Keep replies short, spoken, and practical.`
 
-  const completion = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     model: env.openaiModel,
-    response_format: { type: 'json_object' },
-    messages: [
+    text: { format: { type: 'json_object' } },
+    tools: internetLookup ? [{ type: 'web_search' }] : [],
+    input: [
       { role: 'system', content: conversationPrompt },
       {
         role: 'user',
@@ -280,7 +299,7 @@ Keep replies short, spoken, and practical.`
     ],
   })
 
-  const content = completion.choices[0]?.message?.content
+  const content = response.output_text
   if (!content) {
     return fallbackAssistantResponse(request)
   }
@@ -304,9 +323,11 @@ async function extractProductDraft(request: AssistantRequest) {
     return extractDraftFromText(request.message)
   }
 
+  const internetLookup = wantsInternetLookup(request.message)
   const extractionPrompt = `
 You are an LLM extraction agent.
 Your only task is to convert the seller's spoken product information into JSON for the add-product form.
+If the seller explicitly asks you to look up the product online, you may search the web to gather likely product details.
 
 Return strict JSON:
 {
@@ -323,10 +344,11 @@ Return strict JSON:
 If a field is missing, leave it empty or null.
 Do not include any explanation outside JSON.`
 
-  const completion = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     model: env.openaiModel,
-    response_format: { type: 'json_object' },
-    messages: [
+    text: { format: { type: 'json_object' } },
+    tools: internetLookup ? [{ type: 'web_search' }] : [],
+    input: [
       { role: 'system', content: extractionPrompt },
       {
         role: 'user',
@@ -337,7 +359,7 @@ Do not include any explanation outside JSON.`
     ],
   })
 
-  const content = completion.choices[0]?.message?.content
+  const content = response.output_text
   if (!content) {
     return extractDraftFromText(request.message)
   }

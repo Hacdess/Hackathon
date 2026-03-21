@@ -4,6 +4,7 @@ dotenv.config()
 
 export const env = {
   port: Number(process.env.PORT || 3000),
+  host: process.env.HOST || '0.0.0.0',
   frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
   nodeEnv: process.env.NODE_ENV || 'development',
   sessionCookieName: process.env.SESSION_COOKIE_NAME || 'auth_token',
@@ -43,3 +44,15 @@ export const env = {
 }
 
 export const isProduction = env.nodeEnv === 'production'
+
+export function validateEnv() {
+  const missing: string[] = []
+
+  if (!env.databaseUrl) {
+    missing.push('DATABASE_URL')
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
+  }
+}

@@ -94,3 +94,30 @@ export type AgoraAssistantSession = {
   createdAt: string
   updatedAt: string
 }
+
+export type DashboardStat = {
+  label: string
+  value: number
+  delta: string | null
+  danger?: boolean
+}
+
+export type DashboardMovementBar = {
+  label: string
+  incoming: number
+  outgoing: number
+}
+
+export type DashboardActivity = {
+  title: string
+  meta: string
+  icon: string
+  tone: string
+  timestamp: string
+}
+
+export type DashboardResponse = {
+  stats: DashboardStat[]
+  movement: DashboardMovementBar[]
+  activities: DashboardActivity[]
+}
