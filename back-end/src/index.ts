@@ -1,8 +1,18 @@
 import { createApp } from './app'
 import { env } from './config/env'
+import { initializeDatabase } from './db/init'
 
-const app = createApp()
+async function bootstrap() {
+  await initializeDatabase()
 
-app.listen(env.port, () => {
-  console.log(`Backend is running at http://localhost:${env.port}`)
+  const app = createApp()
+
+  app.listen(env.port, () => {
+    console.log(`Backend is running at http://localhost:${env.port}`)
+  })
+}
+
+void bootstrap().catch((error) => {
+  console.error('Failed to start backend:', error)
+  process.exit(1)
 })

@@ -17,7 +17,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     {
       role: 'assistant',
       content:
-        'Start an Agora session to connect the website with the remote voice agent. The backend will turn the agent transcript into replies and JSON for the add-product form.',
+        'Start talking to the AI assistant. It can guide you around the website, answer stock and Vietnam tax workflow questions, and help fill and confirm the add-product form.',
     },
   ])
   const [productDraft, setProductDraft] = useState<ProductDraft | null>(null)

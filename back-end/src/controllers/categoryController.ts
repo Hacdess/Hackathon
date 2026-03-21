@@ -15,30 +15,30 @@ function statusCodeFor(message: string) {
 }
 
 export const categoryController = {
-  list(_req: Request, res: Response) {
-    res.json(categoryService.listCategories())
+  async list(_req: Request, res: Response) {
+    res.json(await categoryService.listCategories())
   },
-  create(req: Request, res: Response) {
+  async create(req: Request, res: Response) {
     try {
-      const category = categoryService.createCategory(req.body)
+      const category = await categoryService.createCategory(req.body)
       res.status(201).json(category)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create category.'
       res.status(statusCodeFor(message)).json({ message })
     }
   },
-  update(req: Request, res: Response) {
+  async update(req: Request, res: Response) {
     try {
-      const category = categoryService.updateCategory(getRouteParam(req, 'id'), req.body)
+      const category = await categoryService.updateCategory(getRouteParam(req, 'id'), req.body)
       res.json(category)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update category.'
       res.status(statusCodeFor(message)).json({ message })
     }
   },
-  delete(req: Request, res: Response) {
+  async delete(req: Request, res: Response) {
     try {
-      categoryService.deleteCategory(getRouteParam(req, 'id'))
+      await categoryService.deleteCategory(getRouteParam(req, 'id'))
       res.json({ message: 'Category deleted.' })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to delete category.'

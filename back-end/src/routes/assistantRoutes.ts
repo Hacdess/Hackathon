@@ -11,6 +11,7 @@ assistantRoutes.post('/agora/session/:sessionId/process', assistantController.pr
 assistantRoutes.use(requireAuth)
 assistantRoutes.post('/agora/session/start', assistantController.startAgoraSession)
 assistantRoutes.get('/agora/session/:sessionId', assistantController.getAgoraSession)
+assistantRoutes.post('/agora/session/:sessionId/stop', assistantController.stopAgoraSession)
 assistantRoutes.get('/agora-token', assistantController.agoraToken)
 assistantRoutes.post('/chat', assistantController.chat)
 assistantRoutes.post('/voice', upload.single('audio'), assistantController.voice)

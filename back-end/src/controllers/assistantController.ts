@@ -49,6 +49,24 @@ export const assistantController = {
     }
   },
 
+  async stopAgoraSession(req: AuthenticatedRequest, res: Response) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ message: 'Unauthorized' })
+        return
+      }
+
+      const sessionId = typeof req.params.sessionId === 'string' ? req.params.sessionId : ''
+      const session = await agoraAssistantSessionService.stopSession(sessionId, req.user.id)
+      res.json(session)
+    } catch (error) {
+      console.error('Agora session stop error:', error)
+      res.status(500).json({
+        message: error instanceof Error ? error.message : 'Unable to stop Agora session.',
+      })
+    }
+  },
+
   async processAgoraAgentTurn(req: Request, res: Response) {
     try {
       if (

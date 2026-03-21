@@ -4,23 +4,24 @@ import { productRepository } from '../repositories/productRepository'
 import type { ProductWithCategory } from '../types/domain'
 
 export const productService = {
-  listProducts(): ProductWithCategory[] {
-    return productRepository.findAll().map((product) => ({
+  async listProducts(): Promise<ProductWithCategory[]> {
+    const products = await productRepository.findAll()
+    return Promise.all(products.map(async (product) => ({
       ...product,
       category: product.categoryId
-        ? categoryRepository.findById(product.categoryId) ?? null
+        ? (await categoryRepository.findById(product.categoryId)) ?? null
         : null,
-    }))
+    })))
   },
-  getProduct(id: string) {
-    const product = productRepository.findById(id)
+  async getProduct(id: string) {
+    const product = await productRepository.findById(id)
     if (!product) {
       throw new Error('Product not found.')
     }
 
     return product
   },
-  createProduct(input: {
+  async createProduct(input: {
     name?: string
     sku?: string
     description?: string
@@ -44,7 +45,7 @@ export const productService = {
       updatedAt: new Date().toISOString(),
     })
   },
-  updateProduct(
+  async updateProduct(
     id: string,
     input: {
       name?: string
@@ -55,22 +56,22 @@ export const productService = {
       categoryId?: string | null
     },
   ) {
-    const product = productRepository.findById(id)
+    const product = await productRepository.findById(id)
     if (!product) {
       throw new Error('Product not found.')
     }
 
-    return productRepository.update(product, {
+    return productRepository.update(id, {
       name: input.name,
       sku: input.sku,
       description: input.description,
       price: input.price !== undefined ? Number(input.price) : undefined,
       stock: input.stock !== undefined ? Number(input.stock) : undefined,
-      categoryId: input.categoryId,
+      categoryId: input.categoryId !== undefined ? input.categoryId : product.categoryId,
     })
   },
-  deleteProduct(id: string) {
-    const removedProduct = productRepository.deleteById(id)
+  async deleteProduct(id: string) {
+    const removedProduct = await productRepository.deleteById(id)
     if (!removedProduct) {
       throw new Error('Product not found.')
     }

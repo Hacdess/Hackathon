@@ -3,10 +3,10 @@ import { categoryRepository } from '../repositories/categoryRepository'
 import { productRepository } from '../repositories/productRepository'
 
 export const categoryService = {
-  listCategories() {
+  async listCategories() {
     return categoryRepository.findAll()
   },
-  createCategory(input: { name?: string; description?: string }) {
+  async createCategory(input: { name?: string; description?: string }) {
     if (!input.name) {
       throw new Error('Category name is required.')
     }
@@ -18,20 +18,20 @@ export const categoryService = {
       createdAt: new Date().toISOString(),
     })
   },
-  updateCategory(id: string, input: { name?: string; description?: string }) {
-    const category = categoryRepository.findById(id)
+  async updateCategory(id: string, input: { name?: string; description?: string }) {
+    const category = await categoryRepository.findById(id)
     if (!category) {
       throw new Error('Category not found.')
     }
 
-    return categoryRepository.update(category, input)
+    return categoryRepository.update(id, input)
   },
-  deleteCategory(id: string) {
-    const removedCategory = categoryRepository.deleteById(id)
+  async deleteCategory(id: string) {
+    const removedCategory = await categoryRepository.deleteById(id)
     if (!removedCategory) {
       throw new Error('Category not found.')
     }
 
-    productRepository.clearCategory(removedCategory.id)
+    await productRepository.clearCategory(removedCategory.id)
   },
 }

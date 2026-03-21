@@ -25,7 +25,7 @@ export function clearSessionCookie(res: Response) {
   })
 }
 
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const cookies = parseCookies(req.headers.cookie)
   const token = cookies[env.sessionCookieName]
 
@@ -34,7 +34,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     return
   }
 
-  const user = authService.getUserBySessionToken(token)
+  const user = await authService.getUserBySessionToken(token)
 
   if (!user) {
     clearSessionCookie(res)

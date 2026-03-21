@@ -18,6 +18,7 @@ export default function CreateProductPage() {
   const [categoryId, setCategoryId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [aiSyncMessage, setAiSyncMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -32,16 +33,16 @@ export default function CreateProductPage() {
     void loadCategories()
   }, [])
 
-  const applyAssistantDraft = () => {
+  useEffect(() => {
     if (!productDraft) {
       return
     }
 
-    setName(productDraft.name || name)
-    setSku(productDraft.sku || sku)
-    setDescription(productDraft.description || description)
-    setPrice(productDraft.price !== null ? String(productDraft.price) : price)
-    setStock(productDraft.stock !== null ? String(productDraft.stock) : stock)
+    setName((current) => productDraft.name || current)
+    setSku((current) => productDraft.sku || current)
+    setDescription((current) => productDraft.description || current)
+    setPrice((current) => (productDraft.price !== null ? String(productDraft.price) : current))
+    setStock((current) => (productDraft.stock !== null ? String(productDraft.stock) : current))
 
     if (productDraft.categoryName) {
       const matchedCategory = categories.find(
@@ -52,7 +53,24 @@ export default function CreateProductPage() {
         setCategoryId(matchedCategory.id)
       }
     }
-  }
+
+    const missingFields = [
+      !productDraft.name.trim() ? 'name' : null,
+      !productDraft.sku.trim() ? 'SKU' : null,
+      !productDraft.categoryName.trim() ? 'category' : null,
+      !productDraft.description.trim() ? 'description' : null,
+      productDraft.price === null ? 'sale price' : null,
+      productDraft.stock === null ? 'initial stock' : null,
+    ].filter(Boolean) as string[]
+
+    setAiSyncMessage(
+      missingFields.length === 0
+        ? 'The AI assistant filled the form. Please review the values and confirm them with the agent.'
+        : `The AI assistant filled part of the form. Please confirm the captured values and provide the missing ${missingFields.join(
+            ', ',
+          )}.`,
+    )
+  }, [categories, productDraft])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -110,21 +128,14 @@ export default function CreateProductPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                AI draft ready
+                AI draft synced
               </p>
               <p className="mt-2 text-sm text-slate-600">
-                The assistant extracted product details from your conversation. Apply them to the form,
-                then confirm anything that still looks incomplete.
+                {aiSyncMessage ??
+                  'The assistant extracted product details from your conversation and synced them into the form.'}
               </p>
             </div>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={applyAssistantDraft}
-                className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20"
-              >
-                Apply AI draft
-              </button>
               <button
                 type="button"
                 onClick={clearProductDraft}
@@ -251,6 +262,10 @@ export default function CreateProductPage() {
               <div className="flex items-center gap-3">
                 <Icon icon="solar:pen-linear" className="text-primary" />
                 Pricing review
+              </div>
+              <div className="flex items-center gap-3">
+                <Icon icon="solar:user-check-linear" className="text-primary" />
+                Confirm AI-filled values
               </div>
             </div>
           </section>

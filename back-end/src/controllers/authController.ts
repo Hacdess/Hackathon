@@ -9,9 +9,9 @@ export const authController = {
   me(req: AuthenticatedRequest, res: Response) {
     res.json({ user: authService.sanitizeUser(req.user!) })
   },
-  register(req: Request, res: Response) {
+  async register(req: Request, res: Response) {
     try {
-      const result = authService.register(req.body)
+      const result = await authService.register(req.body)
       setSessionCookie(res, result.token)
       res.status(201).json({
         message: 'Registration successful.',
@@ -23,9 +23,9 @@ export const authController = {
       })
     }
   },
-  login(req: Request, res: Response) {
+  async login(req: Request, res: Response) {
     try {
-      const result = authService.login(req.body)
+      const result = await authService.login(req.body)
       setSessionCookie(res, result.token)
       res.json({
         message: 'Login successful.',
@@ -37,10 +37,10 @@ export const authController = {
       })
     }
   },
-  logout(req: Request, res: Response) {
+  async logout(req: Request, res: Response) {
     const cookies = parseCookies(req.headers.cookie)
     const token = cookies[env.sessionCookieName]
-    authService.logout(token)
+    await authService.logout(token)
     clearSessionCookie(res)
     res.json({ message: 'Logged out successfully.' })
   },

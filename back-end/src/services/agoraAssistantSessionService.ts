@@ -1,7 +1,7 @@
 import { agoraAssistantSessionRepository } from '../repositories/agoraAssistantSessionRepository'
 import { env } from '../config/env'
 import type { AssistantMessage, AssistantResponse } from '../types/domain'
-import { agoraAgentService } from './agoraAgentService'
+import { agoraHandler } from './agoraHandler'
 import { agoraService } from './agoraService'
 import { assistantService } from './assistantService'
 
@@ -30,11 +30,8 @@ export const agoraAssistantSessionService = {
       },
     })
 
-    const agentLaunch = await agoraAgentService.startSession({
+    const agentLaunch = await agoraHandler.startAgentSession({
       channel: session.channel,
-      userId: input.userId,
-      sessionId: session.id,
-      currentPath: input.currentPath,
     })
 
     const updatedSession = agoraAssistantSessionRepository.updateSession(session, {
@@ -67,6 +64,22 @@ export const agoraAssistantSessionService = {
     }
 
     return session
+  },
+
+  async stopSession(sessionId: string, userId: string) {
+    const session = this.getSession(sessionId, userId)
+
+    if (session.agentLaunch.mode === 'external' && session.agentLaunch.sessionId) {
+      await agoraHandler.stopAgentSession(session.agentLaunch.sessionId)
+    }
+
+    return agoraAssistantSessionRepository.updateSession(session, {
+      agentLaunch: {
+        ...session.agentLaunch,
+        status: 'stopped',
+        message: 'Agora agent session stopped.',
+      },
+    })
   },
 
   async processAgentTurn(input: {

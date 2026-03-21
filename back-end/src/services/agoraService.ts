@@ -44,4 +44,33 @@ export const agoraService = {
       expiresInSeconds: env.agoraTokenExpirationInSeconds,
     }
   },
+
+  createRtcTokenForUid(channelName: string, uid: number) {
+    if (!env.agoraAppId || !env.agoraAppCertificate) {
+      throw new Error(
+        'Agora token service is not configured. Please set AGORA_APP_ID and AGORA_APP_CERTIFICATE on the backend.',
+      )
+    }
+
+    const channel = normalizeChannelName(channelName)
+    const issuedAt = Math.floor(Date.now() / 1000)
+    const expiresAt = issuedAt + env.agoraTokenExpirationInSeconds
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      env.agoraAppId,
+      env.agoraAppCertificate,
+      channel,
+      uid,
+      RtcRole.PUBLISHER,
+      expiresAt,
+    )
+
+    return {
+      appId: env.agoraAppId,
+      channel,
+      uid,
+      token,
+      expiresAt,
+      expiresInSeconds: env.agoraTokenExpirationInSeconds,
+    }
+  },
 }

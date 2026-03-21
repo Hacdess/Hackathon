@@ -1,45 +1,169 @@
-import { products } from '../data/store'
 import type { Product } from '../types/domain'
+import { query } from '../db/postgres'
 
 export const productRepository = {
-  findAll() {
-    return products
+  async findAll() {
+    const result = await query<{
+      id: string
+      name: string
+      sku: string
+      description: string
+      price: string
+      stock: number
+      category_id: string | null
+      created_at: Date
+      updated_at: Date
+    }>(`
+      SELECT id, name, sku, description, price, stock, category_id, created_at, updated_at
+      FROM products
+      ORDER BY created_at DESC
+    `)
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      sku: row.sku,
+      description: row.description,
+      price: Number(row.price),
+      stock: row.stock,
+      categoryId: row.category_id,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+    }))
   },
-  findById(id: string) {
-    return products.find((product) => product.id === id)
+  async findById(id: string) {
+    const result = await query<{
+      id: string
+      name: string
+      sku: string
+      description: string
+      price: string
+      stock: number
+      category_id: string | null
+      created_at: Date
+      updated_at: Date
+    }>(
+      `
+        SELECT id, name, sku, description, price, stock, category_id, created_at, updated_at
+        FROM products
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [id],
+    )
+
+    const row = result.rows[0]
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          sku: row.sku,
+          description: row.description,
+          price: Number(row.price),
+          stock: row.stock,
+          categoryId: row.category_id,
+          createdAt: row.created_at.toISOString(),
+          updatedAt: row.updated_at.toISOString(),
+        }
+      : undefined
   },
-  create(product: Product) {
-    products.unshift(product)
+  async create(product: Product) {
+    await query(
+      `
+        INSERT INTO products (id, name, sku, description, price, stock, category_id, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `,
+      [
+        product.id,
+        product.name,
+        product.sku,
+        product.description,
+        product.price,
+        product.stock,
+        product.categoryId,
+        product.createdAt,
+        product.updatedAt,
+      ],
+    )
+
     return product
   },
-  update(
-    product: Product,
+  async update(
+    id: string,
     updates: Partial<Pick<Product, 'name' | 'sku' | 'description' | 'price' | 'stock' | 'categoryId'>>,
   ) {
-    product.name = updates.name ?? product.name
-    product.sku = updates.sku ?? product.sku
-    product.description = updates.description ?? product.description
-    product.price = updates.price ?? product.price
-    product.stock = updates.stock ?? product.stock
-    product.categoryId = updates.categoryId !== undefined ? updates.categoryId : product.categoryId
-    product.updatedAt = new Date().toISOString()
-    return product
-  },
-  deleteById(id: string) {
-    const index = products.findIndex((product) => product.id === id)
-    if (index === -1) {
-      return null
-    }
+    const result = await query<{
+      id: string
+      name: string
+      sku: string
+      description: string
+      price: string
+      stock: number
+      category_id: string | null
+      created_at: Date
+      updated_at: Date
+    }>(
+      `
+        UPDATE products
+        SET
+          name = COALESCE($2, name),
+          sku = COALESCE($3, sku),
+          description = COALESCE($4, description),
+          price = COALESCE($5, price),
+          stock = COALESCE($6, stock),
+          category_id = $7,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, name, sku, description, price, stock, category_id, created_at, updated_at
+      `,
+      [
+        id,
+        updates.name ?? null,
+        updates.sku ?? null,
+        updates.description ?? null,
+        updates.price ?? null,
+        updates.stock ?? null,
+        updates.categoryId !== undefined ? updates.categoryId : null,
+      ],
+    )
 
-    const [removedProduct] = products.splice(index, 1)
-    return removedProduct
+    const row = result.rows[0]
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          sku: row.sku,
+          description: row.description,
+          price: Number(row.price),
+          stock: row.stock,
+          categoryId: row.category_id,
+          createdAt: row.created_at.toISOString(),
+          updatedAt: row.updated_at.toISOString(),
+        }
+      : null
   },
-  clearCategory(categoryId: string) {
-    products.forEach((product) => {
-      if (product.categoryId === categoryId) {
-        product.categoryId = null
-        product.updatedAt = new Date().toISOString()
-      }
-    })
+  async deleteById(id: string) {
+    const result = await query<{
+      id: string
+    }>(
+      `
+        DELETE FROM products
+        WHERE id = $1
+        RETURNING id
+      `,
+      [id],
+    )
+
+    return result.rows[0] ?? null
+  },
+  async clearCategory(categoryId: string) {
+    await query(
+      `
+        UPDATE products
+        SET category_id = NULL, updated_at = NOW()
+        WHERE category_id = $1
+      `,
+      [categoryId],
+    )
   },
 }

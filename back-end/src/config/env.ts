@@ -8,19 +8,38 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   sessionCookieName: process.env.SESSION_COOKIE_NAME || 'auth_token',
   backendPublicUrl: process.env.BACKEND_PUBLIC_URL || 'http://localhost:3000',
-  agoraAppId: process.env.AGORA_APP_ID || '',
-  agoraAppCertificate: process.env.AGORA_APP_CERTIFICATE || '',
-  agoraTokenExpirationInSeconds: Number(process.env.AGORA_TOKEN_EXPIRATION_IN_SECONDS || 3600),
-  agoraAgentStartUrl: process.env.AGORA_AGENT_START_URL || '',
-  agoraAgentApiKey: process.env.AGORA_AGENT_API_KEY || '',
-  agoraAgentName: process.env.AGORA_AGENT_NAME || 'logikho-agora-agent',
-  agoraAgentPipelineId: process.env.AGORA_AGENT_PIPELINE_ID || '',
-  agoraAgentRtcUid: process.env.AGORA_AGENT_RTC_UID || '',
-  agoraAgentWebhookSecret: process.env.AGORA_AGENT_WEBHOOK_SECRET || '',
+  databaseUrl: process.env.DATABASE_URL || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
   openaiTranscriptionModel:
     process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+  agoraAppId: process.env.AGORA_APP_ID || '',
+  agoraAppCertificate: process.env.AGORA_APP_CERTIFICATE || '',
+  agoraTokenExpirationInSeconds: Number(process.env.AGORA_TOKEN_EXPIRATION_IN_SECONDS || 3600),
+  agoraCustomerId: process.env.AGORA_CUSTOMER_ID || '',
+  agoraCustomerSecret: process.env.AGORA_CUSTOMER_SECRET || '',
+  agoraAgentName: process.env.AGORA_AGENT_NAME || 'logikho-agora-agent',
+  agoraAgentPipelineId: process.env.AGORA_AGENT_PIPELINE_ID || '',
+  agoraAgentRtcUid: process.env.AGORA_AGENT_RTC_UID || '',
+  agoraAgentAsrVendor: process.env.AGORA_AGENT_ASR_VENDOR || 'deepgram',
+  agoraAgentAsrUrl: process.env.AGORA_AGENT_ASR_URL || 'wss://api.deepgram.com/v1/listen',
+  agoraAgentAsrModel: process.env.AGORA_AGENT_ASR_MODEL || 'nova-3',
+  agoraAgentAsrLanguage: process.env.AGORA_AGENT_ASR_LANGUAGE || 'en',
+  agoraAgentLlmUrl:
+    process.env.AGORA_AGENT_LLM_URL || 'https://api.openai.com/v1/chat/completions',
+  agoraAgentLlmVendor: process.env.AGORA_AGENT_LLM_VENDOR || 'openai',
+  agoraAgentLlmModel: process.env.AGORA_AGENT_LLM_MODEL || 'gpt-4.1-mini',
+  agoraAgentLlmFailureMessage:
+    process.env.AGORA_AGENT_LLM_FAILURE_MESSAGE || 'Please hold on a second.',
+  agoraAgentLlmSystemMessage:
+    process.env.AGORA_AGENT_LLM_SYSTEM_MESSAGE || 'You are a helpful chatbot',
+  agoraAgentLlmGreetingMessage: process.env.AGORA_AGENT_LLM_GREETING_MESSAGE || '',
+  agoraAgentTtsVendor: process.env.AGORA_AGENT_TTS_VENDOR || 'minimax',
+  agoraAgentTtsUrl:
+    process.env.AGORA_AGENT_TTS_URL || 'wss://api-uw.minimax.io/ws/v1/t2a_v2',
+  agoraAgentTtsModel: process.env.AGORA_AGENT_TTS_MODEL || 'speech-2.8-turbo',
+  agoraAgentTtsVoiceId: process.env.AGORA_AGENT_TTS_VOICE_ID || 'English_radiant_girl',
+  agoraAgentWebhookSecret: process.env.AGORA_AGENT_WEBHOOK_SECRET || '',
 }
 
 export const isProduction = env.nodeEnv === 'production'

@@ -1,245 +1,128 @@
 import { Icon } from '@iconify/react'
-import AgoraRTC from 'agora-rtc-sdk-ng'
-import type {
-  IAgoraRTCClient,
-  IAgoraRTCRemoteUser,
-  IMicrophoneAudioTrack,
-  IRemoteAudioTrack,
-} from 'agora-rtc-sdk-ng'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAssistant } from '../context/AssistantContext'
 import { API_BASE_URL } from '../lib/api'
-import type {
-  AgoraAssistantSessionResponse,
-  AgoraAssistantSessionState,
-} from '../lib/api'
+import type { AssistantResponse } from '../lib/api'
 
-const AGORA_CHANNEL = import.meta.env.VITE_AGORA_CHANNEL || 'logikho-ai'
-const hasAgoraConfig = Boolean(AGORA_CHANNEL)
+async function safeSpeak(text: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return
+  }
+
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.rate = 1
+  window.speechSynthesis.speak(utterance)
+}
 
 export function AssistantWidget() {
   const location = useLocation()
   const { messages, setMessages, setProductDraft } = useAssistant()
   const [isOpen, setIsOpen] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [isSessionActive, setIsSessionActive] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [voiceStatus, setVoiceStatus] = useState('Ready')
-  const [agoraWarning, setAgoraWarning] = useState<string | null>(null)
-  const [agoraConnected, setAgoraConnected] = useState(false)
-  const [remoteAgentConnected, setRemoteAgentConnected] = useState(false)
-  const [agentMode, setAgentMode] = useState<string>('Awaiting launch')
-  const clientRef = useRef<IAgoraRTCClient | null>(null)
-  const trackRef = useRef<IMicrophoneAudioTrack | null>(null)
-  const remoteAudioTrackRef = useRef<IRemoteAudioTrack | null>(null)
-  const sessionIdRef = useRef<string | null>(null)
-  const pollingRef = useRef<number | null>(null)
-  const lastUpdatedAtRef = useRef<string | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   useEffect(() => {
     return () => {
-      remoteAudioTrackRef.current?.stop()
-      if (pollingRef.current) {
-        window.clearInterval(pollingRef.current)
-      }
+      window.speechSynthesis?.cancel()
+      streamRef.current?.getTracks().forEach((track) => track.stop())
     }
   }, [])
 
-  const syncSessionState = (session: AgoraAssistantSessionState | AgoraAssistantSessionResponse) => {
-    setMessages(session.messages)
-    setProductDraft(session.productDraft)
-    setAgentMode(
-      `${session.agentLaunch.agentName} · ${session.agentLaunch.mode} · ${session.agentLaunch.status}`,
-    )
+  const pushAssistantResponse = (response: AssistantResponse, userText?: string) => {
+    setMessages((current) => [
+      ...current,
+      ...(userText ? [{ role: 'user' as const, content: userText }] : []),
+      { role: 'assistant', content: response.reply },
+    ])
 
-    if (session.agentLaunch.message) {
-      setAgoraWarning(session.agentLaunch.message)
+    if (response.productDraft) {
+      setProductDraft(response.productDraft)
     }
 
-    if ('updatedAt' in session) {
-      lastUpdatedAtRef.current = session.updatedAt
-    }
+    void safeSpeak(response.reply)
   }
 
-  const startAgoraSession = async () => {
-    const response = await fetch(`${API_BASE_URL}/api/assistant/agora/session/start`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        channel: AGORA_CHANNEL,
-        currentPath: location.pathname,
-      }),
-    })
-
-    const payload = (await response.json()) as AgoraAssistantSessionResponse & { message?: string }
-
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to start Agora session.')
-    }
-
-    return payload
-  }
-
-  const pollSessionState = async (sessionId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/assistant/agora/session/${sessionId}`, {
-      credentials: 'include',
-    })
-
-    const payload = (await response.json()) as AgoraAssistantSessionState & { message?: string }
-
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to refresh Agora session.')
-    }
-
-    if (lastUpdatedAtRef.current !== payload.updatedAt) {
-      syncSessionState(payload)
-    }
-
-    if (payload.agentLaunch.status === 'running') {
-      setAgoraWarning(null)
-    }
-  }
-
-  const startPolling = (sessionId: string) => {
-    if (pollingRef.current) {
-      window.clearInterval(pollingRef.current)
-    }
-
-    pollingRef.current = window.setInterval(() => {
-      void pollSessionState(sessionId).catch((pollError) => {
-        setError(
-          pollError instanceof Error ? pollError.message : 'Unable to refresh Agora session.',
-        )
-      })
-    }, 2500)
-  }
-
-  const startAgoraConversation = async () => {
-    if (!hasAgoraConfig) {
-      throw new Error('Agora is not configured. Please provide a channel name.')
-    }
-
-    if (!clientRef.current) {
-      clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' })
-    }
-
-    try {
-      setIsConnecting(true)
-      const agoraSession = await startAgoraSession()
-      sessionIdRef.current = agoraSession.sessionId
-      syncSessionState(agoraSession)
-      const client = clientRef.current
-      const handleUserPublished = async (
-        remoteUser: IAgoraRTCRemoteUser,
-        mediaType: 'audio' | 'video',
-      ) => {
-        await client.subscribe(remoteUser, mediaType)
-
-        if (mediaType === 'audio' && remoteUser.audioTrack) {
-          remoteAudioTrackRef.current?.stop()
-          remoteAudioTrackRef.current = remoteUser.audioTrack
-          remoteUser.audioTrack.play()
-          setRemoteAgentConnected(true)
-          setVoiceStatus(`Agora live on ${agoraSession.channel}`)
-        }
-      }
-
-      const handleRemoteUserGone = (remoteUser: IAgoraRTCRemoteUser) => {
-        if (remoteAudioTrackRef.current && remoteUser.audioTrack === remoteAudioTrackRef.current) {
-          remoteAudioTrackRef.current.stop()
-          remoteAudioTrackRef.current = null
-        }
-
-        setRemoteAgentConnected(false)
-      }
-
-      client.removeAllListeners()
-      client.on('user-published', handleUserPublished)
-      client.on('user-unpublished', handleRemoteUserGone)
-      client.on('user-left', handleRemoteUserGone)
-
-      await client.join(
-        agoraSession.appId,
-        agoraSession.channel,
-        agoraSession.token,
-        agoraSession.account,
-      )
-      const track = await AgoraRTC.createMicrophoneAudioTrack()
-      trackRef.current = track
-      await client.publish([track])
-      setAgoraConnected(true)
-      setAgoraWarning(null)
-      setRemoteAgentConnected(false)
-      setIsSessionActive(true)
-      setVoiceStatus(
-        `Joined ${agoraSession.channel}, waiting for ${agoraSession.agentLaunch.agentName} audio`,
-      )
-      startPolling(agoraSession.sessionId)
-    } catch (sessionError) {
-      const message =
-        sessionError instanceof Error
-          ? `Agora session failed: ${sessionError.message}`
-          : 'Agora session failed.'
-      setAgoraWarning(message)
-      await stopAgoraConversation()
-      throw new Error(message)
-    } finally {
-      setIsConnecting(false)
-    }
-  }
-
-  const stopAgoraConversation = async () => {
-    try {
-      if (pollingRef.current) {
-        window.clearInterval(pollingRef.current)
-        pollingRef.current = null
-      }
-
-      if (trackRef.current) {
-        trackRef.current.stop()
-        trackRef.current.close()
-      }
-
-      if (remoteAudioTrackRef.current) {
-        remoteAudioTrackRef.current.stop()
-      }
-
-      if (clientRef.current) {
-        clientRef.current.removeAllListeners()
-        await clientRef.current.leave()
-      }
-    } finally {
-      trackRef.current = null
-      remoteAudioTrackRef.current = null
-      clientRef.current = null
-      sessionIdRef.current = null
-      lastUpdatedAtRef.current = null
-      setAgoraConnected(false)
-      setRemoteAgentConnected(false)
-      setIsSessionActive(false)
-      setVoiceStatus('Ready')
-    }
-  }
-
-  const handleStartConversation = async () => {
+  const startVoiceCapture = async () => {
     setError(null)
     setIsOpen(true)
 
     try {
-      await startAgoraConversation()
-      setVoiceStatus('Listening with Agora')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      streamRef.current = stream
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = async () => {
+        setIsProcessing(true)
+        setVoiceStatus('Processing speech')
+
+        try {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+          const formData = new FormData()
+          formData.append('audio', blob, 'assistant.webm')
+          formData.append(
+            'payload',
+            JSON.stringify({
+              currentPath: location.pathname,
+              conversation: messages,
+            }),
+          )
+
+          const response = await fetch(`${API_BASE_URL}/api/assistant/voice`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          })
+
+          const payload = (await response.json()) as AssistantResponse & { message?: string }
+
+          if (!response.ok) {
+            throw new Error(payload.message || 'Unable to process voice input.')
+          }
+
+          pushAssistantResponse(payload, payload.transcript)
+          setVoiceStatus('Ready')
+        } catch (voiceError) {
+          setError(voiceError instanceof Error ? voiceError.message : 'Unable to process voice input.')
+          setVoiceStatus('Ready')
+        } finally {
+          setIsProcessing(false)
+          stream.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setIsRecording(true)
+      setVoiceStatus('Listening')
     } catch (captureError) {
-      await stopAgoraConversation()
       setError(captureError instanceof Error ? captureError.message : 'Unable to start voice capture.')
+      setVoiceStatus('Ready')
     }
   }
 
-  const handleStopConversation = async () => {
-    await stopAgoraConversation()
+  const stopVoiceCapture = async () => {
+    if (!mediaRecorderRef.current) {
+      return
+    }
+
+    mediaRecorderRef.current.stop()
+    mediaRecorderRef.current = null
+    setIsRecording(false)
   }
 
   return (
@@ -249,36 +132,14 @@ export function AssistantWidget() {
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <div>
               <h4 className="font-heading text-lg font-black text-[#0f1724]">
-                Agora
+                OpenAI Assistant
               </h4>
               <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
                 {voiceStatus}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Agora handles the conversation. The LLM converts voice content into product-form JSON when needed.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    agoraConnected ? 'bg-emerald-500' : 'bg-slate-300'
-                  }`}
-                />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {agoraConnected ? 'Agora connected' : 'Agora not connected'}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    remoteAgentConnected ? 'bg-sky-500' : 'bg-slate-300'
-                  }`}
-                />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {remoteAgentConnected ? 'Agent audio detected' : 'Waiting for agent audio'}
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                {agentMode}
+                Speak naturally. The assistant can guide you around the website, answer stock or
+                tax workflow questions, and fill the add-product form from your voice.
               </p>
             </div>
             <button
@@ -308,41 +169,30 @@ export function AssistantWidget() {
                 {error}
               </div>
             ) : null}
-
-            {agoraWarning ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                {agoraWarning}
-              </div>
-            ) : null}
           </div>
 
           <div className="border-t border-slate-200 p-4">
             <p className="mb-3 text-sm text-slate-500">
-              Agora now owns the voice loop. The backend only processes agent text into replies and
-              product-form JSON, while this page listens for remote agent audio.
-            </p>
-
-            <p className="mb-3 text-xs font-medium text-slate-400">
-              Start the session, join the channel, and let the remote Agora agent do the listening and speaking.
+              The assistant uses OpenAI speech-to-text and LLM processing directly through your backend.
             </p>
 
             <button
-              onClick={() => void (isSessionActive ? handleStopConversation() : handleStartConversation())}
+              onClick={() => void (isRecording ? stopVoiceCapture() : startVoiceCapture())}
               className={`flex w-full items-center justify-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold ${
-                isSessionActive ? 'bg-red-500 text-white' : 'bg-primary text-white'
-              } transition hover:scale-[1.01]`}
-              title={isSessionActive ? 'Stop Agora conversation' : 'Start Agora conversation'}
-              disabled={isConnecting}
+                isRecording ? 'bg-red-500 text-white' : 'bg-primary text-white'
+              } transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70`}
+              title={isRecording ? 'Stop voice capture' : 'Start voice capture'}
+              disabled={isProcessing}
             >
               <Icon
-                icon={isSessionActive ? 'solar:danger-circle-bold' : 'solar:microphone-3-bold'}
+                icon={isRecording ? 'solar:danger-circle-bold' : 'solar:microphone-3-bold'}
                 className="text-xl"
               />
-              {isConnecting
-                ? 'Connecting to Agora...'
-                : isSessionActive
-                  ? 'Stop Agora conversation'
-                  : 'Start Agora conversation'}
+              {isProcessing
+                ? 'Processing...'
+                : isRecording
+                  ? 'Stop Recording'
+                  : 'Start Talking'}
             </button>
           </div>
         </div>

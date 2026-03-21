@@ -77,7 +77,7 @@ export type AssistantResponse = {
 export type AgoraAgentLaunch = {
   agentName: string
   mode: 'manual' | 'external'
-  status: 'not_configured' | 'starting' | 'running' | 'failed'
+  status: 'not_configured' | 'starting' | 'running' | 'stopped' | 'failed'
   message?: string
   sessionId?: string
 }

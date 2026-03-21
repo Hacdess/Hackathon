@@ -24,6 +24,86 @@ const emptyDraft = (): ProductDraft => ({
   categoryName: '',
 })
 
+function getMissingDraftFields(draft: ProductDraft | null) {
+  if (!draft) {
+    return ['name', 'sku', 'category', 'description', 'price', 'stock']
+  }
+
+  const missing: string[] = []
+
+  if (!draft.name.trim()) {
+    missing.push('name')
+  }
+  if (!draft.sku.trim()) {
+    missing.push('sku')
+  }
+  if (!draft.categoryName.trim()) {
+    missing.push('category')
+  }
+  if (!draft.description.trim()) {
+    missing.push('description')
+  }
+  if (draft.price === null) {
+    missing.push('price')
+  }
+  if (draft.stock === null) {
+    missing.push('stock')
+  }
+
+  return missing
+}
+
+function formatMissingFields(missingFields: string[]) {
+  if (missingFields.length === 0) {
+    return 'No required fields are missing.'
+  }
+
+  if (missingFields.length === 1) {
+    return missingFields[0]
+  }
+
+  return `${missingFields.slice(0, -1).join(', ')}, and ${missingFields.at(-1)}`
+}
+
+function buildProductReply(draft: ProductDraft | null) {
+  const missingFields = getMissingDraftFields(draft)
+
+  if (!draft) {
+    return {
+      reply:
+        'I am ready to help fill the add-product form. Please say the product name, SKU, category, description, sale price, and initial stock.',
+      suggestions: [
+        'Say the product name and SKU clearly.',
+        'Mention category, sale price, and initial stock.',
+      ],
+      warnings: ['I could not extract enough product data from that recording yet.'],
+    }
+  }
+
+  if (missingFields.length === 0) {
+    return {
+      reply:
+        'I filled the add-product draft and sent it to the form. Please review the values and confirm if the name, SKU, category, description, sale price, and initial stock are correct.',
+      suggestions: [
+        'Confirm the draft if everything looks correct.',
+        'Tell me exactly which field should be changed if anything is wrong.',
+      ],
+      warnings: [],
+    }
+  }
+
+  return {
+    reply: `I filled part of the add-product draft and sent it to the form. Please confirm the captured values and tell me the missing ${formatMissingFields(
+      missingFields,
+    )}.`,
+    suggestions: [
+      'Confirm the fields that are already correct.',
+      `Provide the missing ${formatMissingFields(missingFields)}.`,
+    ],
+    warnings: [`Missing product fields: ${missingFields.join(', ')}`],
+  }
+}
+
 function extractDraftFromText(message: string): ProductDraft | null {
   const draft = emptyDraft()
   const lower = message.toLowerCase()
@@ -121,18 +201,14 @@ function fallbackAssistantResponse(request: AssistantRequest): AssistantResponse
     }
   }
 
+  const productReply = buildProductReply(draft)
+
   return {
     intent,
-    reply:
-      draft
-        ? 'I extracted a product draft from your voice input. Please confirm the fields I captured and tell me what still needs correction.'
-        : 'I am ready to help fill the add-product form. Please say the product name, SKU, category, description, sale price, and initial stock.',
+    reply: productReply.reply,
     productDraft: draft,
-    suggestions: [
-      'Say the product name and SKU clearly.',
-      'Mention category, sale price, and initial stock.',
-    ],
-    warnings: draft ? [] : ['I could not extract enough product data from that recording yet.'],
+    suggestions: productReply.suggestions,
+    warnings: productReply.warnings,
   }
 }
 
@@ -185,7 +261,10 @@ Return strict JSON:
 }
 
 Do not return productDraft here.
-If the user is providing product data, set intent to "product_form_fill" and ask the user to confirm or provide missing fields.`
+If the user is providing product data, set intent to "product_form_fill".
+When product data is partial, ask only for the missing fields.
+When product data seems complete, ask the user to confirm the captured fields before submission.
+Keep replies short, spoken, and practical.`
 
   const completion = await openai.chat.completions.create({
     model: env.openaiModel,
@@ -297,17 +376,21 @@ export const assistantService = {
     }
 
     const productDraft = await extractProductDraft(request)
+    const missingFields = getMissingDraftFields(productDraft)
+    const productReply = buildProductReply(productDraft)
 
     return parseAssistantPayload(
       JSON.stringify({
         intent: conversationReply.intent,
-        reply: conversationReply.reply,
+        reply: productReply.reply,
         productDraft,
-        suggestions: conversationReply.suggestions,
-        warnings:
-          productDraft === null
-            ? [...conversationReply.warnings, 'No structured product draft has been confirmed yet.']
-            : conversationReply.warnings,
+        suggestions:
+          conversationReply.suggestions.length > 0
+            ? conversationReply.suggestions
+            : productReply.suggestions,
+        warnings: [...conversationReply.warnings, ...productReply.warnings, ...(missingFields.length
+          ? [`Waiting for confirmation or missing values: ${missingFields.join(', ')}`]
+          : ['Draft ready for user confirmation.'])],
       }),
     )
   },
