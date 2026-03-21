@@ -67,6 +67,42 @@ export const productRepository = {
         }
       : undefined
   },
+  async findBySku(sku: string) {
+    const result = await query<{
+      id: string
+      name: string
+      sku: string
+      description: string
+      price: string
+      stock: number
+      category_id: string | null
+      created_at: Date
+      updated_at: Date
+    }>(
+      `
+        SELECT id, name, sku, description, price, stock, category_id, created_at, updated_at
+        FROM products
+        WHERE LOWER(sku) = LOWER($1)
+        LIMIT 1
+      `,
+      [sku],
+    )
+
+    const row = result.rows[0]
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          sku: row.sku,
+          description: row.description,
+          price: Number(row.price),
+          stock: row.stock,
+          categoryId: row.category_id,
+          createdAt: row.created_at.toISOString(),
+          updatedAt: row.updated_at.toISOString(),
+        }
+      : undefined
+  },
   async create(product: Product) {
     await query(
       `

@@ -47,6 +47,32 @@ export const categoryRepository = {
         }
       : undefined
   },
+  async findByName(name: string) {
+    const result = await query<{
+      id: string
+      name: string
+      description: string
+      created_at: Date
+    }>(
+      `
+        SELECT id, name, description, created_at
+        FROM categories
+        WHERE LOWER(name) = LOWER($1)
+        LIMIT 1
+      `,
+      [name],
+    )
+
+    const row = result.rows[0]
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          createdAt: row.created_at.toISOString(),
+        }
+      : undefined
+  },
   async create(category: Category) {
     await query(
       `
