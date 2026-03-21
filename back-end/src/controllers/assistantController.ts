@@ -5,6 +5,7 @@ import { env } from '../config/env'
 import { agoraAssistantSessionService } from '../services/agoraAssistantSessionService'
 import { agoraService } from '../services/agoraService'
 import { assistantService } from '../services/assistantService'
+import { elevenLabsVoiceService } from '../services/elevenLabsVoiceService'
 
 export const assistantController = {
   async startAgoraSession(req: AuthenticatedRequest, res: Response) {
@@ -167,6 +168,27 @@ export const assistantController = {
       console.error('Assistant voice error:', error)
       res.status(500).json({
         message: error instanceof Error ? error.message : 'Unable to process assistant audio.',
+      })
+    }
+  },
+
+  async speak(req: Request, res: Response) {
+    try {
+      const text = typeof req.body?.text === 'string' ? req.body.text : ''
+
+      if (!text.trim()) {
+        res.status(400).json({ message: 'Text is required.' })
+        return
+      }
+
+      const audio = await elevenLabsVoiceService.synthesize(text)
+      res.setHeader('Content-Type', `audio/mpeg`)
+      res.setHeader('Cache-Control', 'no-store')
+      res.send(audio)
+    } catch (error) {
+      console.error('Assistant speak error:', error)
+      res.status(500).json({
+        message: error instanceof Error ? error.message : 'Unable to synthesize assistant speech.',
       })
     }
   },

@@ -6,6 +6,7 @@ import type { AssistantResponse } from '../types/domain'
 import {
   buildProductReply,
   detectIntent,
+  extractJsonObject,
   extractDraftFromText,
   getUserConversationText,
   stringifyConversation,
@@ -101,7 +102,7 @@ Keep replies short, spoken, and practical.`
 
     const response = await openai.responses.create({
       model: env.openaiModel,
-      text: { format: { type: 'json_object' } },
+      ...(internetLookup ? {} : { text: { format: { type: 'json_object' } } }),
       tools: internetLookup ? [{ type: 'web_search' }] : [],
       input: [
         { role: 'system', content: conversationPrompt },
@@ -120,7 +121,9 @@ Keep replies short, spoken, and practical.`
     }
 
     try {
-      const parsed = JSON.parse(content) as Omit<AssistantResponse, 'productDraft' | 'transcript'>
+      const parsed = JSON.parse(
+        extractJsonObject(content),
+      ) as Omit<AssistantResponse, 'productDraft' | 'transcript'>
       return {
         intent: parsed.intent,
         reply: parsed.reply,

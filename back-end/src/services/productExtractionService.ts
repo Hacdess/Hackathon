@@ -3,6 +3,8 @@ import { env } from '../config/env'
 import { categoryRepository } from '../repositories/categoryRepository'
 import type { ProductDraft } from '../types/domain'
 import {
+  coerceProductDraft,
+  extractJsonObject,
   extractDraftFromText,
   stringifyConversation,
   type AssistantRequest,
@@ -42,7 +44,7 @@ Do not include any explanation outside JSON.`
     const categories = await categoryRepository.findAll()
     const response = await openai.responses.create({
       model: env.openaiModel,
-      text: { format: { type: 'json_object' } },
+      ...(internetLookup ? {} : { text: { format: { type: 'json_object' } } }),
       tools: internetLookup ? [{ type: 'web_search' }] : [],
       input: [
         { role: 'system', content: extractionPrompt },
@@ -63,8 +65,10 @@ Do not include any explanation outside JSON.`
     }
 
     try {
-      const parsed = JSON.parse(content) as { productDraft: ProductDraft | null }
-      return parsed.productDraft
+      const parsed = JSON.parse(extractJsonObject(content)) as {
+        productDraft: ProductDraft | Record<string, unknown> | null
+      }
+      return coerceProductDraft(parsed.productDraft)
     } catch {
       return extractDraftFromText(request.message)
     }

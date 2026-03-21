@@ -14,6 +14,12 @@ export const env = {
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
   openaiTranscriptionModel:
     process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+  elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
+  elevenlabsVoiceId: process.env.ELEVENLABS_VOICE_ID || '',
+  elevenlabsTtsModel: process.env.ELEVENLABS_TTS_MODEL || 'eleven_multilingual_v2',
+  elevenlabsSttModel: process.env.ELEVENLABS_STT_MODEL || 'scribe_v1',
+  elevenlabsOutputFormat: process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128',
+  elevenlabsLanguageCode: process.env.ELEVENLABS_LANGUAGE_CODE || 'en',
   agoraAppId: process.env.AGORA_APP_ID || '',
   agoraAppCertificate: process.env.AGORA_APP_CERTIFICATE || '',
   agoraTokenExpirationInSeconds: Number(process.env.AGORA_TOKEN_EXPIRATION_IN_SECONDS || 3600),

@@ -221,6 +221,59 @@ export function parseAssistantPayload(rawText: string): AssistantResponse {
   }
 }
 
+export function extractJsonObject(rawText: string) {
+  const trimmed = rawText.trim()
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed
+  }
+
+  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i) ?? trimmed.match(/```\s*([\s\S]*?)```/i)
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim()
+  }
+
+  const firstBrace = trimmed.indexOf('{')
+  const lastBrace = trimmed.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1)
+  }
+
+  return trimmed
+}
+
+export function coerceProductDraft(value: ProductDraft | null | Record<string, unknown>) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const maybeNumber = (input: unknown) => {
+    if (typeof input === 'number' && Number.isFinite(input)) {
+      return input
+    }
+
+    if (typeof input === 'string') {
+      const normalized = input.replace(/[^0-9.-]+/g, '').trim()
+      if (!normalized) {
+        return null
+      }
+
+      const parsed = Number(normalized)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    return null
+  }
+
+  return {
+    name: typeof value.name === 'string' ? value.name : '',
+    sku: typeof value.sku === 'string' ? value.sku : '',
+    description: typeof value.description === 'string' ? value.description : '',
+    price: maybeNumber(value.price),
+    stock: maybeNumber(value.stock),
+    categoryName: typeof value.categoryName === 'string' ? value.categoryName : '',
+  } satisfies ProductDraft
+}
+
 export function buildProductReply(
   draft: ProductDraft | null,
   options?: {
@@ -356,6 +409,10 @@ export async function prepareProductDraft(request: AssistantRequest, extractedDr
     categoryName: normalizeWhitespace(draft.categoryName),
     price: draft.price !== null && Number.isFinite(draft.price) && draft.price >= 0 ? draft.price : null,
     stock: draft.stock !== null && Number.isFinite(draft.stock) && draft.stock >= 0 ? draft.stock : null,
+  }
+
+  if (draft.price === null && wantsInternetLookup(request.message, request.currentPath)) {
+    warnings.push('Price could not be verified from the generated data yet, so please confirm it manually.')
   }
 
   if (draft.categoryName) {

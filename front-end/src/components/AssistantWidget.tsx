@@ -5,15 +5,38 @@ import { useAssistant } from '../context/AssistantContext'
 import { API_BASE_URL } from '../lib/api'
 import type { AssistantResponse } from '../lib/api'
 
-async function safeSpeak(text: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return
+async function playAssistantAudio(text: string) {
+  const response = await fetch(`${API_BASE_URL}/api/assistant/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text }),
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    let message = 'Unable to play assistant audio.'
+
+    try {
+      const payload = (await response.json()) as { message?: string }
+      message = payload.message || message
+    } catch {
+      // Ignore parse failures for binary or empty responses.
+    }
+
+    throw new Error(message)
   }
 
-  window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.rate = 1
-  window.speechSynthesis.speak(utterance)
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const audio = new Audio(objectUrl)
+
+  try {
+    await audio.play()
+  } finally {
+    audio.onended = () => URL.revokeObjectURL(objectUrl)
+  }
 }
 
 export function AssistantWidget() {
@@ -30,7 +53,6 @@ export function AssistantWidget() {
 
   useEffect(() => {
     return () => {
-      window.speechSynthesis?.cancel()
       streamRef.current?.getTracks().forEach((track) => track.stop())
     }
   }, [])
@@ -46,7 +68,9 @@ export function AssistantWidget() {
       setProductDraft(response.productDraft)
     }
 
-    void safeSpeak(response.reply)
+    void playAssistantAudio(response.reply).catch((playbackError) => {
+      console.error('Assistant audio playback error:', playbackError)
+    })
   }
 
   const startVoiceCapture = async () => {
@@ -132,7 +156,7 @@ export function AssistantWidget() {
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <div>
               <h4 className="font-heading text-lg font-black text-[#0f1724]">
-                OpenAI Assistant
+                ElevenLabs Assistant
               </h4>
               <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
                 {voiceStatus}
@@ -173,7 +197,7 @@ export function AssistantWidget() {
 
           <div className="border-t border-slate-200 p-4">
             <p className="mb-3 text-sm text-slate-500">
-              The assistant uses OpenAI speech-to-text and LLM processing directly through your backend.
+              The assistant uses backend speech processing and ElevenLabs voice output.
             </p>
 
             <button
