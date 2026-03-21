@@ -1,0 +1,8 @@
+# Bỏ qua thư viện (Em đang gõ sai chính tả chữ modules kìa!)
+node_modules/
+
+# Bỏ qua file bảo mật (ĐÚNG)
+.env
+
+# Bỏ qua thư mục code đã dịch ra JS (Cần thiết cho TypeScript)
+dist/
