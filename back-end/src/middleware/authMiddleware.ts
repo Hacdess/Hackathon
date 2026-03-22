@@ -8,6 +8,15 @@ export type AuthenticatedRequest = Request & {
   user?: SessionUser
 }
 
+function extractBearerToken(authHeader?: string) {
+  if (!authHeader?.startsWith('Bearer ')) {
+    return undefined
+  }
+
+  const token = authHeader.slice('Bearer '.length).trim()
+  return token || undefined
+}
+
 export function setSessionCookie(res: Response, token: string) {
   res.cookie(env.sessionCookieName, token, {
     httpOnly: true,
@@ -27,7 +36,7 @@ export function clearSessionCookie(res: Response) {
 
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const cookies = parseCookies(req.headers.cookie)
-  const token = cookies[env.sessionCookieName]
+  const token = cookies[env.sessionCookieName] || extractBearerToken(req.headers.authorization)
 
   if (!token) {
     res.status(401).json({ message: 'Unauthorized' })

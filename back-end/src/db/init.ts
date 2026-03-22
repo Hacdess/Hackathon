@@ -1,6 +1,12 @@
 import crypto from 'crypto'
 import { query } from './postgres'
 
+function hashSeedPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex')
+  return `scrypt:${salt}:${derivedKey}`
+}
+
 export async function initializeDatabase() {
   await query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -51,7 +57,7 @@ export async function initializeDatabase() {
         INSERT INTO users (id, name, email, password)
         VALUES ($1, $2, $3, $4);
       `,
-      [crypto.randomUUID(), 'Demo Seller', demoUserEmail, 'password123'],
+      [crypto.randomUUID(), 'Demo Seller', demoUserEmail, hashSeedPassword('password123')],
     )
 
     await query(

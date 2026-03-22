@@ -16,6 +16,7 @@ export const authController = {
       res.status(201).json({
         message: 'Registration successful.',
         user: result.user,
+        token: result.token,
       })
     } catch (error) {
       res.status(409).json({
@@ -30,6 +31,7 @@ export const authController = {
       res.json({
         message: 'Login successful.',
         user: result.user,
+        token: result.token,
       })
     } catch (error) {
       res.status(401).json({
@@ -39,7 +41,10 @@ export const authController = {
   },
   async logout(req: Request, res: Response) {
     const cookies = parseCookies(req.headers.cookie)
-    const token = cookies[env.sessionCookieName]
+    const bearerToken = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice('Bearer '.length).trim()
+      : undefined
+    const token = cookies[env.sessionCookieName] || bearerToken
     await authService.logout(token)
     clearSessionCookie(res)
     res.json({ message: 'Logged out successfully.' })

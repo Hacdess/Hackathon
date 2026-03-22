@@ -11,6 +11,10 @@ function statusCodeFor(message: string) {
     return 400
   }
 
+  if (message === 'A product with this SKU already exists.') {
+    return 409
+  }
+
   return 500
 }
 

@@ -1,9 +1,31 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://3.27.232.193:3000'
+const SESSION_TOKEN_KEY = 'hackathon_auth_token'
 
 export type AuthUser = {
   id: string
   name: string
   email: string
+}
+
+export function getStoredSessionToken() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return window.localStorage.getItem(SESSION_TOKEN_KEY)
+}
+
+export function setStoredSessionToken(token: string | null) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  if (token) {
+    window.localStorage.setItem(SESSION_TOKEN_KEY, token)
+    return
+  }
+
+  window.localStorage.removeItem(SESSION_TOKEN_KEY)
 }
 
 export type Category = {
@@ -78,6 +100,12 @@ export type AssistantResponse = {
   warnings: string[]
 }
 
+export type AuthResponse = {
+  user: AuthUser
+  token: string
+  message?: string
+}
+
 export type AgoraTokenResponse = {
   appId: string
   channel: string
@@ -136,10 +164,15 @@ type ApiOptions = Omit<RequestInit, 'body'> & {
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers)
   let body = options.body
+  const token = getStoredSessionToken()
 
   if (body && typeof body === 'object' && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
     body = JSON.stringify(body)
+  }
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`)
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {

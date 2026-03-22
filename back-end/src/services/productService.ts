@@ -33,6 +33,10 @@ export const productService = {
       throw new Error('Product name and SKU are required.')
     }
 
+    if (await productRepository.findBySku(input.sku)) {
+      throw new Error('A product with this SKU already exists.')
+    }
+
     return productRepository.create({
       id: crypto.randomUUID(),
       name: input.name,
@@ -59,6 +63,13 @@ export const productService = {
     const product = await productRepository.findById(id)
     if (!product) {
       throw new Error('Product not found.')
+    }
+
+    if (input.sku && input.sku.toLowerCase() !== product.sku.toLowerCase()) {
+      const existingProduct = await productRepository.findBySku(input.sku)
+      if (existingProduct) {
+        throw new Error('A product with this SKU already exists.')
+      }
     }
 
     return productRepository.update(id, {

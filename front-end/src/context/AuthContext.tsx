@@ -6,8 +6,8 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { apiFetch } from '../lib/api'
-import type { AuthUser } from '../lib/api'
+import { apiFetch, setStoredSessionToken } from '../lib/api'
+import type { AuthResponse, AuthUser } from '../lib/api'
 
 type AuthContextValue = {
   user: AuthUser | null
@@ -43,23 +43,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       async login(email, password) {
-        const response = await apiFetch<{ user: AuthUser }>('/api/auth/login', {
+        const response = await apiFetch<AuthResponse>('/api/auth/login', {
           method: 'POST',
           body: { email, password },
         })
+        setStoredSessionToken(response.token)
         setUser(response.user)
       },
       async register(name, email, password) {
-        const response = await apiFetch<{ user: AuthUser }>('/api/auth/register', {
+        const response = await apiFetch<AuthResponse>('/api/auth/register', {
           method: 'POST',
           body: { name, email, password },
         })
+        setStoredSessionToken(response.token)
         setUser(response.user)
       },
       async logout() {
         await apiFetch<{ message: string }>('/api/auth/logout', {
           method: 'POST',
         })
+        setStoredSessionToken(null)
         setUser(null)
       },
     }),
