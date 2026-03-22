@@ -21,9 +21,10 @@ function fallbackAssistantResponse(request: AssistantRequest): AssistantResponse
   const draft =
     intent === 'product_form_fill' ? extractDraftFromText(getUserConversationText(request)) : null
 
-  if (intent === 'onboarding') {
+  if (intent === 'website_guidance') {
     return {
       intent,
+      responseSource: 'agent',
       reply:
         'I can guide you through the website. Dashboard shows store activity, Products lists inventory items, Categories organizes stock groups, and Add Product is where I help collect fields for a new item.',
       productDraft: null,
@@ -32,24 +33,11 @@ function fallbackAssistantResponse(request: AssistantRequest): AssistantResponse
     }
   }
 
-  if (intent === 'tax_advice') {
-    return {
-      intent,
-      reply:
-        'I can give general Vietnam tax workflow guidance around invoices, VAT-related records, and stock documentation, but please confirm legal details with official regulations or a qualified accountant.',
-      productDraft: null,
-      suggestions: [
-        'Ask which records to keep for stock and invoices.',
-        'Ask how product records support tax documentation.',
-      ],
-      warnings: ['This is operational guidance, not legal or accounting advice.'],
-    }
-  }
-
   const productReply = buildProductReply(draft)
 
   return {
     intent,
+    responseSource: 'agent',
     reply: productReply.reply,
     productDraft: draft,
     suggestions: productReply.suggestions,
@@ -71,14 +59,10 @@ export const conversationAgentService = {
 You are the first conversation agent for a seller support app.
 Your jobs are:
 1. Instruct the user so they get familiar with the website.
-2. Answer general questions related to stock workflows and high-level Vietnam tax record-keeping.
-3. When the user is adding a new product, ask concise follow-up questions and ask the user to confirm extracted inputs.
+2. When the user is adding a new product, ask concise follow-up questions and ask the user to confirm extracted inputs.
 
 Website guide:
 ${assistantKnowledgeRepository.getWebsiteGuide().map((item) => `- ${item}`).join('\n')}
-
-Vietnam tax guidance rules:
-${assistantKnowledgeRepository.getVietnamTaxGuide().map((item) => `- ${item}`).join('\n')}
 
 Current category list:
 ${categories.map((category) => `- ${category.name}`).join('\n') || '- No categories found'}
@@ -87,7 +71,8 @@ Current path: ${request.currentPath || 'unknown'}
 
 Return strict JSON:
 {
-  "intent": "onboarding" | "tax_advice" | "product_form_fill",
+  "intent": "website_guidance" | "product_form_fill",
+  "responseSource": "agent",
   "reply": "string",
   "suggestions": ["string"],
   "warnings": ["string"]
@@ -95,9 +80,11 @@ Return strict JSON:
 
 Do not return productDraft here.
 If the user is providing product data, set intent to "product_form_fill".
+Otherwise set intent to "website_guidance".
 When product data is partial, ask only for the missing fields.
 When product data seems complete, ask the user to confirm the captured fields before submission.
 When the user explicitly asks you to search online or generate the product form from internet data, mention that you searched online and ask the user to confirm the generated details before saving.
+Do not answer tax-law questions here because those are handled by a separate RAG flow.
 Keep replies short, spoken, and practical.`
 
     const response = await openai.responses.create({
@@ -126,10 +113,14 @@ Keep replies short, spoken, and practical.`
       ) as Omit<AssistantResponse, 'productDraft' | 'transcript'>
       return {
         intent: parsed.intent,
+        responseSource: 'agent',
         reply: parsed.reply,
         productDraft: null,
         suggestions: parsed.suggestions ?? [],
         warnings: parsed.warnings ?? [],
+        answered: parsed.answered,
+        confidence: parsed.confidence,
+        citations: parsed.citations ?? [],
       }
     } catch {
       return fallbackAssistantResponse(request)

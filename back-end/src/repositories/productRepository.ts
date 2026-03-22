@@ -1,8 +1,14 @@
 import type { Product } from '../types/domain'
+import { isDatabaseConfigured } from '../config/env'
+import { products } from '../data/store'
 import { query } from '../db/postgres'
 
 export const productRepository = {
   async findAll() {
+    if (!isDatabaseConfigured) {
+      return [...products].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -32,6 +38,10 @@ export const productRepository = {
     }))
   },
   async findById(id: string) {
+    if (!isDatabaseConfigured) {
+      return products.find((product) => product.id === id)
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -68,6 +78,10 @@ export const productRepository = {
       : undefined
   },
   async findBySku(sku: string) {
+    if (!isDatabaseConfigured) {
+      return products.find((product) => product.sku.toLowerCase() === sku.toLowerCase())
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -104,6 +118,11 @@ export const productRepository = {
       : undefined
   },
   async create(product: Product) {
+    if (!isDatabaseConfigured) {
+      products.unshift(product)
+      return product
+    }
+
     await query(
       `
         INSERT INTO products (id, name, sku, description, price, stock, category_id, created_at, updated_at)
@@ -128,6 +147,40 @@ export const productRepository = {
     id: string,
     updates: Partial<Pick<Product, 'name' | 'sku' | 'description' | 'price' | 'stock' | 'categoryId'>>,
   ) {
+    if (!isDatabaseConfigured) {
+      const existingProduct = products.find((product) => product.id === id)
+      if (!existingProduct) {
+        return null
+      }
+
+      if (updates.name !== undefined) {
+        existingProduct.name = updates.name
+      }
+
+      if (updates.sku !== undefined) {
+        existingProduct.sku = updates.sku
+      }
+
+      if (updates.description !== undefined) {
+        existingProduct.description = updates.description
+      }
+
+      if (updates.price !== undefined) {
+        existingProduct.price = updates.price
+      }
+
+      if (updates.stock !== undefined) {
+        existingProduct.stock = updates.stock
+      }
+
+      if (updates.categoryId !== undefined) {
+        existingProduct.categoryId = updates.categoryId
+      }
+
+      existingProduct.updatedAt = new Date().toISOString()
+      return existingProduct
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -179,6 +232,16 @@ export const productRepository = {
       : null
   },
   async deleteById(id: string) {
+    if (!isDatabaseConfigured) {
+      const index = products.findIndex((product) => product.id === id)
+      if (index === -1) {
+        return null
+      }
+
+      const [removedProduct] = products.splice(index, 1)
+      return removedProduct ? { id: removedProduct.id } : null
+    }
+
     const result = await query<{
       id: string
     }>(
@@ -193,6 +256,17 @@ export const productRepository = {
     return result.rows[0] ?? null
   },
   async clearCategory(categoryId: string) {
+    if (!isDatabaseConfigured) {
+      const updatedAt = new Date().toISOString()
+      for (const product of products) {
+        if (product.categoryId === categoryId) {
+          product.categoryId = null
+          product.updatedAt = updatedAt
+        }
+      }
+      return
+    }
+
     await query(
       `
         UPDATE products

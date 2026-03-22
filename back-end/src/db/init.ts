@@ -1,7 +1,13 @@
 import crypto from 'crypto'
+import { isDatabaseConfigured } from '../config/env'
 import { query } from './postgres'
 
 export async function initializeDatabase() {
+  if (!isDatabaseConfigured) {
+    console.warn('DATABASE_URL is not set. Using in-memory demo data.')
+    return
+  }
+
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY,
