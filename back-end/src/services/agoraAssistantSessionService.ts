@@ -21,7 +21,7 @@ export const agoraAssistantSessionService = {
       initialMessage: {
         role: 'assistant',
         content:
-          'Agora session is ready. Once the voice agent joins the channel, it can guide the user, answer stock or tax questions, and confirm product fields before the form is filled.',
+          'Agora session is ready. Once the voice agent joins the channel, it can guide the user around the website, route tax-law questions through the indexed RAG corpus, and confirm product fields before the form is filled.',
       },
       agentLaunch: {
         agentName: env.agoraAgentName,

@@ -1,8 +1,14 @@
 import type { Category } from '../types/domain'
+import { isDatabaseConfigured } from '../config/env'
+import { categories } from '../data/store'
 import { query } from '../db/postgres'
 
 export const categoryRepository = {
   async findAll() {
+    if (!isDatabaseConfigured) {
+      return [...categories].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -22,6 +28,10 @@ export const categoryRepository = {
     }))
   },
   async findById(id: string) {
+    if (!isDatabaseConfigured) {
+      return categories.find((category) => category.id === id)
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -48,6 +58,10 @@ export const categoryRepository = {
       : undefined
   },
   async findByName(name: string) {
+    if (!isDatabaseConfigured) {
+      return categories.find((category) => category.name.toLowerCase() === name.toLowerCase())
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -74,6 +88,11 @@ export const categoryRepository = {
       : undefined
   },
   async create(category: Category) {
+    if (!isDatabaseConfigured) {
+      categories.unshift(category)
+      return category
+    }
+
     await query(
       `
         INSERT INTO categories (id, name, description, created_at)
@@ -85,6 +104,23 @@ export const categoryRepository = {
     return category
   },
   async update(id: string, updates: Partial<Pick<Category, 'name' | 'description'>>) {
+    if (!isDatabaseConfigured) {
+      const existingCategory = categories.find((category) => category.id === id)
+      if (!existingCategory) {
+        return null
+      }
+
+      if (updates.name !== undefined) {
+        existingCategory.name = updates.name
+      }
+
+      if (updates.description !== undefined) {
+        existingCategory.description = updates.description
+      }
+
+      return existingCategory
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -113,6 +149,16 @@ export const categoryRepository = {
       : null
   },
   async deleteById(id: string) {
+    if (!isDatabaseConfigured) {
+      const index = categories.findIndex((category) => category.id === id)
+      if (index === -1) {
+        return null
+      }
+
+      const [removedCategory] = categories.splice(index, 1)
+      return removedCategory ?? null
+    }
+
     const result = await query<{
       id: string
       name: string

@@ -1,6 +1,7 @@
-import type { AssistantResponse } from '../types/domain'
+﻿import type { AssistantResponse } from '../types/domain'
 import {
   buildProductReply,
+  detectIntent,
   getMissingDraftFields,
   hasConfirmationIntent,
   parseAssistantPayload,
@@ -10,6 +11,7 @@ import {
 import { conversationAgentService } from './conversationAgentService'
 import { productExtractionService } from './productExtractionService'
 import { speechService } from './speechService'
+import { taxLawRagService } from './taxLawRagService'
 
 export const assistantService = {
   async transcribeAudio(file: Express.Multer.File) {
@@ -17,6 +19,11 @@ export const assistantService = {
   },
 
   async respond(request: AssistantRequest): Promise<AssistantResponse> {
+    const detectedIntent = detectIntent(request.message, request.currentPath)
+    if (detectedIntent === 'tax_law_rag') {
+      return taxLawRagService.answer(request)
+    }
+
     const conversationReply = await conversationAgentService.generateReply(request)
 
     if (conversationReply.intent !== 'product_form_fill') {
@@ -37,6 +44,7 @@ export const assistantService = {
     return parseAssistantPayload(
       JSON.stringify({
         intent: conversationReply.intent,
+        responseSource: conversationReply.responseSource,
         reply: productReply.reply,
         productDraft,
         suggestions:
@@ -55,3 +63,4 @@ export const assistantService = {
     )
   },
 }
+

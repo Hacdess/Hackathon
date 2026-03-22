@@ -1,6 +1,12 @@
 import { categoryRepository } from '../repositories/categoryRepository'
 import { productRepository } from '../repositories/productRepository'
-import type { AssistantIntent, AssistantMessage, AssistantResponse, Category, ProductDraft } from '../types/domain'
+import type {
+  AssistantIntent,
+  AssistantMessage,
+  AssistantResponse,
+  Category,
+  ProductDraft,
+} from '../types/domain'
 
 export type AssistantRequest = {
   message: string
@@ -67,6 +73,44 @@ export function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+function normalizeIntentText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+}
+
+function matchesNormalizedTaxIntent(message: string) {
+  const normalized = normalizeIntentText(message)
+  const taxKeywords = [
+    'tax',
+    'taxes',
+    'tax law',
+    'tax laws',
+    'tax rate',
+    'tax filing',
+    'tax invoice',
+    'vat',
+    'invoice',
+    'invoice law',
+    'regulation',
+    'decree',
+    'circular',
+    'hoa don',
+    'thue',
+    'luat thue',
+    'nghi dinh',
+    'thong tu',
+    'quy dinh',
+    'ma so thue',
+    'ke khai thue',
+    'khau tru thue',
+  ]
+
+  return taxKeywords.some((keyword) => normalized.includes(keyword))
+}
+
 export function extractDraftFromText(message: string): ProductDraft | null {
   const draft = emptyDraft()
   const lower = message.toLowerCase()
@@ -113,31 +157,62 @@ export function extractDraftFromText(message: string): ProductDraft | null {
   return hasData ? draft : null
 }
 
-export function detectIntent(message: string, currentPath?: string): AssistantIntent {
+function hasProductFormIntent(message: string, currentPath?: string) {
   const lower = message.toLowerCase()
 
-  if (
+  return (
     currentPath === '/products/new' ||
     lower.includes('product') ||
     lower.includes('sku') ||
     lower.includes('stock') ||
     lower.includes('price') ||
     lower.includes('category')
-  ) {
+  )
+}
+
+function hasTaxLawIntent(message: string) {
+  const lower = message.toLowerCase()
+  const taxKeywords = [
+    'tax',
+    'taxes',
+    'tax law',
+    'tax laws',
+    'tax rate',
+    'tax filing',
+    'tax invoice',
+    'vat',
+    'invoice',
+    'invoice law',
+    'regulation',
+    'decree',
+    'circular',
+    'hoa don',
+    'hóa đơn',
+    'thue',
+    'thuế',
+    'luat thue',
+    'luật thuế',
+    'nghi dinh',
+    'nghị định',
+    'thong tu',
+    'thông tư',
+    'quy dinh',
+    'quy định',
+  ]
+
+  return taxKeywords.some((keyword) => lower.includes(keyword))
+}
+
+export function detectIntent(message: string, currentPath?: string): AssistantIntent {
+  if (matchesNormalizedTaxIntent(message) || hasTaxLawIntent(message)) {
+    return 'tax_law_rag'
+  }
+
+  if (hasProductFormIntent(message, currentPath)) {
     return 'product_form_fill'
   }
 
-  if (
-    lower.includes('tax') ||
-    lower.includes('vat') ||
-    lower.includes('invoice') ||
-    lower.includes('hoa don') ||
-    lower.includes('thue')
-  ) {
-    return 'tax_advice'
-  }
-
-  return 'onboarding'
+  return 'website_guidance'
 }
 
 export function wantsInternetLookup(message: string, currentPath?: string) {
@@ -213,11 +288,15 @@ export function parseAssistantPayload(rawText: string): AssistantResponse {
 
   return {
     intent: parsed.intent,
+    responseSource: parsed.responseSource ?? 'agent',
     reply: parsed.reply,
     transcript: parsed.transcript,
     productDraft: parsed.productDraft,
     suggestions: parsed.suggestions ?? [],
     warnings: parsed.warnings ?? [],
+    answered: parsed.answered,
+    confidence: parsed.confidence,
+    citations: parsed.citations ?? [],
   }
 }
 

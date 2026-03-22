@@ -9,11 +9,13 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   sessionCookieName: process.env.SESSION_COOKIE_NAME || 'auth_token',
   backendPublicUrl: process.env.BACKEND_PUBLIC_URL || 'http://localhost:3000',
-  databaseUrl: process.env.DATABASE_URL || '',
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres.oppwaselzjqvmhfrfqrb:Nothing2k@523022007@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o',
   openaiTranscriptionModel:
     process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+  pythonCommand: process.env.PYTHON_COMMAND || 'python',
+  ragCorpusDir: process.env.RAG_CORPUS_DIR || '',
   elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
   elevenlabsVoiceId: process.env.ELEVENLABS_VOICE_ID || '',
   elevenlabsTtsModel: process.env.ELEVENLABS_TTS_MODEL || 'eleven_multilingual_v2',
@@ -50,11 +52,12 @@ export const env = {
 }
 
 export const isProduction = env.nodeEnv === 'production'
+export const isDatabaseConfigured = Boolean(env.databaseUrl)
 
 export function validateEnv() {
   const missing: string[] = []
 
-  if (!env.databaseUrl) {
+  if (isProduction && !env.databaseUrl) {
     missing.push('DATABASE_URL')
   }
 

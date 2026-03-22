@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { isDatabaseConfigured } from '../config/env'
 import { query } from './postgres'
 
 function hashSeedPassword(password: string) {
@@ -8,6 +9,11 @@ function hashSeedPassword(password: string) {
 }
 
 export async function initializeDatabase() {
+  if (!isDatabaseConfigured) {
+    console.warn('DATABASE_URL is not set. Using in-memory demo data.')
+    return
+  }
+
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY,

@@ -1,8 +1,14 @@
 import type { SessionUser } from '../types/domain'
+import { isDatabaseConfigured } from '../config/env'
+import { users } from '../data/store'
 import { query } from '../db/postgres'
 
 export const authRepository = {
   async findByEmail(email: string) {
+    if (!isDatabaseConfigured) {
+      return users.find((user) => user.email.toLowerCase() === email.toLowerCase())
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -21,6 +27,10 @@ export const authRepository = {
     return result.rows[0]
   },
   async findById(id: string) {
+    if (!isDatabaseConfigured) {
+      return users.find((user) => user.id === id)
+    }
+
     const result = await query<{
       id: string
       name: string
@@ -39,6 +49,11 @@ export const authRepository = {
     return result.rows[0]
   },
   async create(user: SessionUser) {
+    if (!isDatabaseConfigured) {
+      users.push(user)
+      return user
+    }
+
     await query(
       `
         INSERT INTO users (id, name, email, password)

@@ -75,7 +75,9 @@ export type DashboardResponse = {
   activities: DashboardActivity[]
 }
 
-export type AssistantIntent = 'onboarding' | 'tax_advice' | 'product_form_fill'
+export type AssistantIntent = 'website_guidance' | 'tax_law_rag' | 'product_form_fill'
+
+export type AssistantResponseSource = 'agent' | 'rag'
 
 export type ProductDraft = {
   name: string
@@ -91,13 +93,31 @@ export type AssistantMessage = {
   content: string
 }
 
+export type AssistantCitation = {
+  chunkId: string
+  score: number
+  symbol: string
+  title: string
+  detailUrl: string
+  issueDate: string
+  effectiveDate: string
+  documentType: string
+  issuingAgency: string
+  excerpt: string
+  sourceFile: string
+}
+
 export type AssistantResponse = {
   intent: AssistantIntent
+  responseSource: AssistantResponseSource
   reply: string
   transcript?: string
   productDraft: ProductDraft | null
   suggestions: string[]
   warnings: string[]
+  answered?: boolean
+  confidence?: number
+  citations?: AssistantCitation[]
 }
 
 export type AuthResponse = {
